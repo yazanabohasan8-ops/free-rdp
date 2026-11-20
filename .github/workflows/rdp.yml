@@ -1,21 +1,28 @@
-name: RDP
+name: Ubuntu VNC
 
 on: [workflow_dispatch]
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
-      - name: Download ngrok
+      - name: Install Desktop Environment & VNC
         run: |
-          Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
-          Expand-Archive ngrok.zip
-          ./ngrok.exe authtoken YOUR_AUTH_TOKEN
+          sudo apt update
+          sudo apt install xfce4 xfce4-goodies tightvncserver git -y
+          vncserver :1
+          vncserver -kill :1
+          mkdir -p ~/.vnc
+          echo "#!/bin/bash
+          xrdb $HOME/.Xresources
+          startxfce4 &" > ~/.vnc/xstartup
+          chmod +x ~/.vnc/xstartup
+          vncserver :1 -geometry 1280x720 -depth 24
 
-      - name: Enable RDP
+      - name: Setup noVNC Server
         run: |
-          net user kamel123 MyStrong123 /add
-          net localgroup administrators kamel123 /add
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name 'fDenyTSConnections' -Value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          ./ngrok.exe tcp 3389
+          git clone https://github.com/novnc/noVNC.git ~/noVNC
+          git clone https://github.com/novnc/websockify ~/noVNC/utils/websockify
+          nohup ~/noVNC/utils/launch.sh --vnc localhost:5901 --listen 6080 &
+          sleep 10
+          nohup ssh -o StrictHostKeyChecking=no -R 80:localhost:6080 serveo.net &
